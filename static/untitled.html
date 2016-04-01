@@ -1,0 +1,24 @@
+    function range() {
+        $.post('/range', 
+            {
+                "a": A, 
+                "b": B
+            }, 
+            function(data) {
+            console.log(data);
+            $('.result').html(data);
+        })
+
+    }
+
+    function cloud() {
+        $.post('/cloud', 
+            {
+                "a": A, 
+                "b": B
+            }, 
+            function(data) {
+            console.log(data);
+            $('.result').html(data);
+        })
+    }
