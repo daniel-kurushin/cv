@@ -304,6 +304,14 @@ class Stereo:
 
 		return _name
 
+	def get_state(self):
+		_, A0, B0 = self.r.ask(); 
+		self.state.update({'pos':dict(
+			a = A0, # курс
+			b = B0, # возвышение
+		)})
+		return self.state
+
 	def get_camera(self, camera = 'left'):
 		return int(self.description['cameras'][camera]['id'])
 

@@ -14,7 +14,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
     stereo = Stereo()
 
     def get_state(self):
-        return self.stereo.state
+        return self.stereo.get_state()
 
     def get_decription(self):
         return self.stereo.description
@@ -35,7 +35,9 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
     def do_scan(self, data):
         print(data, file = sys.stderr)
-        _ = self.stereo.scan()
+        A_min = max(-140, int(data['a_min'][0]))
+        A_max = min( 140, int(data['a_max'][0]))
+        _ = self.stereo.scan(A_min, A_max)
         json.dump(_, open('/tmp/log', 'w'), indent = 2)
         return _
 
