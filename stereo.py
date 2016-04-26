@@ -187,18 +187,26 @@ class Stereo:
 				h_o = 0
 
 			good = []
-			for m,n in flann.knnMatch(des1,des2,k=2):
-				if m.distance < 0.7*n.distance:
-					good.append(m)
+			try:
+				for m,n in flann.knnMatch(des1,des2,k=2):
+					if m.distance < 0.7*n.distance:
+						good.append(m)
+			except cv2.error as e:
+				print("CV excepion ", e, file=sys.stderr)
+
 			if len(good) > MIN_MATCH_COUNT:
 				_kp = kp2
 				_img = img2
 			else:
 				print(' right eye ', end = '', flush = True, file=sys.stderr)
 				good = []
-				for m,n in flann.knnMatch(des1,des3,k=2):
-					if m.distance < 0.7*n.distance:
-						good.append(m)
+				try:
+					for m,n in flann.knnMatch(des1,des3,k=2):
+						if m.distance < 0.7*n.distance:
+							good.append(m)
+				except cv2.error as e:
+					print("CV excepion ", e, file=sys.stderr)
+
 				_kp = kp3
 				_img = img3
 			print("done, %s matches" % (len(good)), file=sys.stderr)
@@ -274,12 +282,16 @@ class Stereo:
 		else:
 			return _
 
-	def rotate(self, data):
-		self.r.move(
+	def rotate(self, data, returnimage = True):
+		_ = self.r.move(
 			data['a'],
 			data['b'],
 		)
-		return self.saveimage(img = self.snapshot())
+		print(returnimage)
+		if returnimage:
+			return self.saveimage(img = self.snapshot())
+		else:
+			return dict(portdata = _)
 
 	def snapshot(self, camera = 'left'):
 		cap = cv2.VideoCapture(self.get_camera(camera))
