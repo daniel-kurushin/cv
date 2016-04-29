@@ -12,6 +12,7 @@ from copy import copy as cpobj
 from datetime import datetime
 from math import tan, radians, degrees
 from time import sleep
+from threading import Thread
 
 from roto import Roto
 from student import Student
@@ -68,6 +69,19 @@ class Stereo:
 		self.W_cam = self.description['cameras']['left']['W']
 		self.H_cam = self.description['cameras']['left']['H']
 
+	def z_range(self, d, y = 0):
+		try:
+			x  = 1 / d
+			k1 = -4490183.80012
+			k2 =   473388.00812
+			k3 =        0.89120
+			k4 =        0.11269
+			k5 = 0.0009 * y + 0.784
+
+			return (k4 + k1 * x**3 + k2 * x**2 + k3 * x) / k5
+		except ZeroDivisionError:
+			return 0
+
 	def xy_to_ab_radians(self, xy = [0,0], AB = [0,0]):
 		Xo, Yo = xy[0] - self.W_cam / 2, self.H_cam / 2 - xy[1]
 		Ao, Bo = AB[0] - 0.0017 * Xo, AB[1] + 0.0019 * Yo
@@ -93,7 +107,7 @@ class Stereo:
 							D += d
 							n += 1
 				try:
-					z = -2.6162 + 2089.6758 / (D / n)
+					z = self.z_range(D / n, y = Yo)
 					if z <   1: z = 0
 					if z > 100: z = 0
 				except ZeroDivisionError:
@@ -157,15 +171,13 @@ class Stereo:
 		flann = cv2.FlannBasedMatcher(index_params, search_params)
 
 		if mode == 'return_data':
-			img2 = self.snapshot(camera)
-			img3 = self.snapshot(camera)
+			img2, img3 = self.stereo_shot(camera)
 		else:
-			img2 = self.snapshot('left')
-			img3 = self.snapshot('right')
+			img2, img3 = self.stereo_shot()
 			D = self.getDisparityMap(img2,img3)
 
 		kp2, des2 = sift.detectAndCompute(img2,None)
-		kp3, des3 = sift.detectAndCompute(img3,None)
+		# kp3, des3 = sift.detectAndCompute(img3,None)
 		_ = dict()
 		for k in self.object_list.keys():
 			_.update({k: dict(matches = 0, items=[], item_coords=[], coords=[])})
@@ -194,26 +206,11 @@ class Stereo:
 			except cv2.error as e:
 				print("CV excepion ", e, file=sys.stderr)
 
-			if len(good) > MIN_MATCH_COUNT:
-				_kp = kp2
-				_img = img2
-			else:
-				print(' right eye ', end = '', flush = True, file=sys.stderr)
-				good = []
-				try:
-					for m,n in flann.knnMatch(des1,des3,k=2):
-						if m.distance < 0.7*n.distance:
-							good.append(m)
-				except cv2.error as e:
-					print("CV excepion ", e, file=sys.stderr)
-
-				_kp = kp3
-				_img = img3
 			print("done, %s matches" % (len(good)), file=sys.stderr)
 
 			if len(good) > MIN_MATCH_COUNT:
 				src_pts = np.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
-				dst_pts = np.float32([ _kp[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
+				dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
 
 				M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
 
@@ -248,7 +245,7 @@ class Stereo:
 					# print(Y1,y,Y2, file=sys.stderr)
 
 
-					cv2.imwrite('./log/%s' % (k.replace('/','_').lstrip('._')),cv2.polylines(cpobj(_img),[np.int32(dst)],True,255,3, cv2.LINE_AA))
+					cv2.imwrite('./log/%s' % (k.replace('/','_').lstrip('._')),cv2.polylines(cpobj(img2),[np.int32(dst)],True,255,3, cv2.LINE_AA))
 					if abs(h/w - H/W) < 1:
 						_.update(
 							{
@@ -274,7 +271,7 @@ class Stereo:
 			del good
 
 		# print(json.dumps(_,indent=2,ensure_ascii=0), file=sys.stderr)
-		_.update(dict(img = _img))
+		_.update(dict(img = img2))
 		
 		if mode == 'save_image':
 			_.update(dict(D = D))
@@ -292,6 +289,28 @@ class Stereo:
 			return self.saveimage(img = self.snapshot())
 		else:
 			return dict(portdata = _)
+
+	def stereo_shot(self, camera = 'both'):
+		img_l = None
+		img_r = None
+
+		def L():
+			nonlocal img_l
+			img_l = self.snapshot(camera = 'left')
+		def R():
+			nonlocal img_r
+			img_r = self.snapshot(camera = 'right')
+
+		if camera == 'both':
+			Thread(target = L).start()
+			Thread(target = R).start()
+			while img_l == None or img_r == None:
+				sleep(0.01)
+
+			return img_l, img_r
+		else:
+			_ = self.snapshot(camera)
+			return _, _
 
 	def snapshot(self, camera = 'left'):
 		cap = cv2.VideoCapture(self.get_camera(camera))
@@ -417,7 +436,7 @@ class Stereo:
 								D += d
 								n += 1
 					try:
-						z = -2.6162 + 2089.6758 / (D / n)
+						z = self.z_range(D / n, y = Yo)
 					except ZeroDivisionError:
 						z = 0
 
@@ -457,4 +476,11 @@ class Stereo:
 
 
 if __name__ == "__main__":
-    Stereo().scan()
+    s = Stereo()
+    print(datetime.now())
+    s.stereo_shot()
+    print(datetime.now())
+    s.snapshot('left')
+    print(datetime.now())
+    s.snapshot('right')
+    print(datetime.now())

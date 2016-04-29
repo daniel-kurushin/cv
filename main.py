@@ -43,7 +43,11 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
     def do_rotate(self, data):
         print(data, file = sys.stderr)
-        return self.stereo.rotate(data, returnimage = int(data['returnimage'][0]))
+        try:
+            _ = int(data['returnimage'][0])
+        except KeyError:
+            _ = 0
+        return self.stereo.rotate(data, returnimage = _)
 
     def do_range(self, data):
         print(data, file = sys.stderr)
