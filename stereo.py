@@ -94,7 +94,8 @@ class Stereo:
 		return 0.0017 * pix
 
 	def getDisparityMap(self,imgL,imgR):
-		disparity = cv2.StereoBM_create(0, 25).compute(imgL, imgR)
+		disparity = cv2.StereoBM_create(0, 25).
+		compute(imgL, imgR)
 		zmap = {}
 
 		for Yo in range(self.H_cam // 6, self.H_cam, self.H_cam // 3):
